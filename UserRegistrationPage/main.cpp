@@ -6,11 +6,19 @@ int MLE; // Çok satýrlý metin alaný
 int NameInput, SurnameInput, PhoneInput, EmailInput, PasswordInput;
 int RegisterButton, UploadPhotoButton, PhotoFrame;
 
+ICBYTES dosyaYolu, foto, kucultulmus, sonFoto;
+int FRM;
+
 struct VERI_TABANI {
     ICDEVICE index_dosya, veri_dosya;
     ICBYTES index, anahtar, bilgi;
     unsigned burayabak = 1;
 };
+
+void ICGUI_Create() {
+    ICG_MWSize(600, 500);
+    ICG_MWTitle("Müþteri Kayýt Formu");
+}
 
 static VERI_TABANI veritaban;
 
@@ -21,16 +29,96 @@ unsigned IndexAra(ICBYTES& index, unsigned long long* map) {
     return 0xffffffff;
 }
 
+// Küçültme fonksiyonu
+void ResmiKucult(ICBYTES& giris, ICBYTES& cikis, double oran) {
+    int genislik = giris.X();
+    int yukseklik = giris.Y();
+    int kanal = giris.Z();
+
+    int yeniGenislik = int(genislik * oran);
+    int yeniYukseklik = int(yukseklik * oran);
+
+    if (yeniGenislik < 1) yeniGenislik = 1;
+    if (yeniYukseklik < 1) yeniYukseklik = 1;
+
+    CreateMatrix(cikis, yeniGenislik, yeniYukseklik, kanal, ICB_UCHAR);
+
+    for (int y = 1; y <= yeniYukseklik; y++) {
+        for (int x = 1; x <= yeniGenislik; x++) {
+            int eskiX = int((x - 1) / oran) + 1;
+            int eskiY = int((y - 1) / oran) + 1;
+
+            if (eskiX > genislik) eskiX = genislik;
+            if (eskiY > yukseklik) eskiY = yukseklik;
+
+            for (int z = 1; z <= kanal; z++) {
+                cikis.B(x, y, z) = giris.B(eskiX, eskiY, z);
+            }
+        }
+    }
+}
+
+// Orta bölgeyi alma fonksiyonu
+void OrtaBolgeyiBul(ICBYTES& giris, ICBYTES& cikis, int bolge_genisligi, int bolge_yuksekligi) {
+    int xBoy = giris.X();
+    int yBoy = giris.Y();
+    int zBoy = giris.Z();
+
+    int baslangicX = (xBoy - bolge_genisligi) / 2 + 1;
+    int baslangicY = (yBoy - bolge_yuksekligi) / 2 + 1;
+
+    CreateMatrix(cikis, bolge_genisligi, bolge_yuksekligi, zBoy, ICB_UCHAR);
+
+    for (int y = 1; y <= bolge_yuksekligi; y++) {
+        for (int x = 1; x <= bolge_genisligi; x++) {
+            for (int z = 1; z <= zBoy; z++) {
+                cikis.B(x, y, z) = giris.B(baslangicX + x - 1, baslangicY + y - 1, z);
+            }
+        }
+    }
+}
+
+void UploadPhoto() {
+    char* yol = OpenFileMenu(dosyaYolu, "JPG\0*.JPG\0PNG\0*.PNG\0BMP\0*.BMP\0JPEG\0*.JPEG");
+    if (yol) {
+        ReadImage(yol, foto);
+
+        // Küçültme oranýný hesapla
+        double oranX = 150.0 / foto.X();
+        double oranY = 150.0 / foto.Y();
+        double oran = (oranX < oranY) ? oranX : oranY;
+
+        // Küçült ve kýrp
+        ResmiKucult(foto, kucultulmus, oran);
+        OrtaBolgeyiBul(kucultulmus, sonFoto, 150, 150);
+
+        // Göster
+        DisplayImage(PhotoFrame, sonFoto);
+        ICG_printf(MLE, "Fotoðraf yüklendi: %d x %d x %d\n", sonFoto.X(), sonFoto.Y(), sonFoto.Z());
+
+    }
+}
+
 void RegisterCustomer(void* p = nullptr)
 {
     ICBYTES ad, soyad, telefon, email, sifre, bilgi, virgul, newline;
     virgul = ","; newline = "\n";
+
+    ad = ""; soyad = ""; telefon = ""; email = ""; sifre = "";
+    veritaban.anahtar = ""; veritaban.bilgi = "";
 
     GetText(NameInput, ad);
     GetText(SurnameInput, soyad);
     GetText(PhoneInput, telefon);
     GetText(EmailInput, email);
     GetText(PasswordInput, sifre);
+
+    // Fotoðraf kontrolü
+    if (sonFoto.X() == 0 || sonFoto.Y() == 0 || sonFoto.Z() == 0) {
+        ICG_printf(MLE, "Lütfen bir fotoðraf yükleyin!\n");
+        return;
+    }
+
 
     veritaban.anahtar = ad; veritaban.anahtar += soyad;
 
@@ -47,16 +135,15 @@ void RegisterCustomer(void* p = nullptr)
         ICG_printf(MLE, "Anahtar üretilemedi!\n");
         return;
     }
-    unsigned hangisi = IndexAra(veritaban.index, map);
 
+    unsigned hangisi = IndexAra(veritaban.index, map);
     if (hangisi != 0xffffffff) {
         ICG_printf(MLE, "Bu müþteri zaten kayýtlý!\n");
         return;
     }
 
     long long sonindex = veritaban.index.Y();
-
-    if (!(veritaban.index.Y() == 1 && veritaban.index.O(1, 1) == 0)) {
+    if (veritaban.index.O(1, sonindex) != 0 || veritaban.index.Y() == 1) {
         sonindex++;
         ResizeMatrix(veritaban.index, 3, sonindex);
     }
@@ -66,13 +153,16 @@ void RegisterCustomer(void* p = nullptr)
     veritaban.index.O(3, sonindex) = GetFileLength(veritaban.veri_dosya);
 
     long long newadd = WriteICBYTES(veritaban.veri_dosya, veritaban.anahtar, veritaban.index.O(3, sonindex));
-    WriteICBYTES(veritaban.veri_dosya, veritaban.bilgi, newadd);
+    newadd = WriteICBYTES(veritaban.veri_dosya, veritaban.bilgi, newadd);
+    WriteICBYTES(veritaban.veri_dosya, sonFoto, newadd); // Fotoðraf kaydý
 
     ICG_printf(MLE, "Müþteri kaydedildi:\n");
     Print(MLE, veritaban.bilgi);
+
+    // Fotoðrafý temizle (bir sonraki kayýtta zorunlu olsun)
+    sonFoto = "";
 }
 
-void UploadPhoto() {}
 
 void Baslama(VERI_TABANI& v) {
     CreateMatrix(v.index, 3, 1, ICB_ULONGLONG);
@@ -90,10 +180,7 @@ void ExitFonksiyonu(void* t) {
     CloseDevice(veritaban.veri_dosya);
 }
 
-void ICGUI_Create() {
-    ICG_MWSize(600, 500);
-    ICG_MWTitle("Müþteri Kayýt Formu");
-}
+
 
 void ICGUI_main() {
     ICGUI_Create();
