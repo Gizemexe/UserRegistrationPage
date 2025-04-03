@@ -5,7 +5,7 @@
 #include <iostream> 
 
 int MLE; // Çok satýrlý metin alaný
-int NameInput, SurnameInput, PhoneInput, EmailInput, PasswordInput;
+int NameInput, SurnameInput, PhoneInput, EmailInput, PasswordInput, ProblemInput;
 int RegisterButton, UploadPhotoButton, PhotoFrame;
 int GenderInput, HealthProblemInput;
 
@@ -15,7 +15,7 @@ int FRM;
 ICBYTES arkaplan;
 int ArkaPlanFrame;
 
-ICBYTES PhotoPreview; 
+ICBYTES PhotoPreview;  // Renk önizleme alaný için bir matris
 
 struct VERI_TABANI {
     ICDEVICE index_dosya, veri_dosya;
@@ -24,7 +24,7 @@ struct VERI_TABANI {
 };
 
 void ICGUI_Create() {
-    ICG_MWSize(900, 600);  
+    ICG_MWSize(900, 600);  // Pencereyi daha geniþ yapýyoruz
     ICG_MWTitle("Müþteri Kayýt Formu");
 }
 
@@ -87,7 +87,7 @@ void OrtaBolgeyiBul(ICBYTES& giris, ICBYTES& cikis, int bolge_genisligi, int bol
 }
 
 void UploadPhoto() {
-    char* yol = OpenFileMenu(dosyaYolu, "JPG\0*.JPG\0JPEG\0*.JPEG");
+    char* yol = OpenFileMenu(dosyaYolu, "JPG\0*.JPG\0JPEG\0*.JPEG\0");
     if (yol) {
         ReadImage(yol, foto);
 
@@ -102,7 +102,7 @@ void UploadPhoto() {
 
         // Göster
         DisplayImage(PhotoFrame, sonFoto);
-        ICG_printf(MLE, "Fotoðraf yüklendi: %d x %d x %d\n", sonFoto.X(), sonFoto.Y(), sonFoto.Z());
+        ICG_printf(MLE, "Photograph is uploaded: %d x %d x %d\n", sonFoto.X(), sonFoto.Y(), sonFoto.Z());
     }
 }
 
@@ -128,12 +128,12 @@ void RegisterCustomer(void* p = nullptr)
     // Health problem (Saðlýk problemi) seçeneði - Seçilen öðeyi al
     ICG_GetListItem(HealthProblemInput, 0, healthProblem);  // HealthProblem seçilen öðe (0 indeksini kullandýk)
 
-    // Health Description
+    // Health Description (Saðlýk Açýklamasý)
     GetText(MLE, healthDesc);
 
     // Fotoðraf kontrolü
     if (sonFoto.X() == 0 || sonFoto.Y() == 0 || sonFoto.Z() == 0) {
-        ICG_printf(MLE, "Lütfen bir fotoðraf yükleyin!\n");
+        ICG_printf(MLE, "Please upload a photograph!\n");
         return;
     }
 
@@ -152,13 +152,13 @@ void RegisterCustomer(void* p = nullptr)
 
     unsigned long long* map = KeyMapTR(veritaban.anahtar, 2);
     if (!map) {
-        ICG_printf(MLE, "Anahtar üretilemedi!\n");
+        ICG_printf(MLE, "Key could not be generated!\n");
         return;
     }
 
     unsigned hangisi = IndexAra(veritaban.index, map);
     if (hangisi != 0xffffffff) {
-        ICG_printf(MLE, "Bu müþteri zaten kayýtlý!\n");
+        ICG_printf(MLE, "You are already registered!\n");
         return;
     }
 
@@ -176,12 +176,14 @@ void RegisterCustomer(void* p = nullptr)
     newadd = WriteICBYTES(veritaban.veri_dosya, veritaban.bilgi, newadd);
     WriteICBYTES(veritaban.veri_dosya, sonFoto, newadd); // Fotoðraf kaydý
 
-    ICG_printf(MLE, "Müþteri kaydedildi:\n");
+    ICG_printf(MLE, "You are registered:\n");
     Print(MLE, veritaban.bilgi);
 
-    // Fotoðrafý temizle 
+    // Fotoðrafý temizle (bir sonraki kayýtta zorunlu olsun)
     sonFoto = "";
+    //DisplayImage(PhotoFrame, sonFoto); // alaný temizle
 }
+
 
 void Baslama(VERI_TABANI& v) {
     CreateMatrix(v.index, 3, 1, ICB_ULONGLONG);
@@ -212,7 +214,7 @@ void DrawLine(ICBYTES& canvas, int x1, int y1, int x2, int y2, int color) {
 
 
     while (true) {
-        // **Ýlk önce sadece ana çizgiyi çizer**
+        // Ýlk önce sadece ana çizgiyi çizer
         Line(canvas, x1, y1, x2, y2, color);
 
         if (x1 == x2 && y1 == y2) break;
@@ -236,17 +238,18 @@ void DrawFilledCircle(ICBYTES& canvas, int cx, int cy, int radius, int color) {
     }
 }
 
+
 void ICGUI_main() {
     ICGUI_Create();
 
-    // Arkaplan 
+    // Arka planýn gösterilmesi
     ReadImage("gym2.bmp", arkaplan);
-    ArkaPlanFrame = ICG_FrameThick(0, 0, 900, 600);  
-    
-    ICG_StaticPanel(580, 50, 270, 40, "Take Steps For a Fit and Healthy Life!");
+    ArkaPlanFrame = ICG_FrameThick(0, 0, 900, 600);  // Pencereyi büyütüyoruz
+
+    ICG_StaticPanel(550, 420, 270, 40, " Take a Step for a Fit and Healthy Life!");
 
     // Form elemanlarý düzenlenmiþ þekilde
-    ICG_StaticPanel(180, 10, 150, 30, "Registration Form");
+    ICG_StaticPanel(400, 10, 150, 30, "         SIGN UP");
 
     // Name, Surname, Phone, Email, Password
     ICG_StaticPanel(50, 50, 80, 30, "Name:");
@@ -261,13 +264,13 @@ void ICGUI_main() {
     ICG_StaticPanel(50, 170, 80, 30, "E-mail:");
     EmailInput = ICG_SLEditThick(150, 170, 200, 30, "");
 
-    ICG_StaticPanel(50, 210, 80, 30, "Password:");
+    ICG_StaticPanel(50, 210, 90, 30, "Password:");
     PasswordInput = ICG_SLPasswordSunken(150, 210, 200, 30);
 
     // Gender
     ICG_StaticPanel(50, 250, 80, 30, "Gender:");
     GenderInput = ICG_ListBox(150, 255, 150, 30, nullptr);
-    ICG_AddToList(GenderInput, "please select");
+    ICG_AddToList(GenderInput, "Please Select");
     ICG_AddToList(GenderInput, "Female");
     ICG_AddToList(GenderInput, "Male");
     ICG_AddToList(GenderInput, "Prefer not to say");
@@ -275,42 +278,47 @@ void ICGUI_main() {
     // Health Problems
     ICG_StaticPanel(50, 290, 220, 30, "Do you have health problems?");
     HealthProblemInput = ICG_ListBox(280, 295, 110, 30, nullptr);
-    ICG_AddToList(HealthProblemInput, "please select");
+    ICG_AddToList(HealthProblemInput, "Please Select");
     ICG_AddToList(HealthProblemInput, "Yes");
     ICG_AddToList(HealthProblemInput, "No");
 
     // Health Description
-    ICG_StaticPanel(50, 335, 250, 30, "Health Problem Description (if any):");
-    MLE = ICG_MLEditSunken(50, 360, 500, 150, "", SCROLLBAR_V);
+    ICG_StaticPanel(50, 335, 250, 30, "Health Problem Description (if any): ");
+    ProblemInput = ICG_SLEditThick(310, 335, 200, 30, "");
+    //MLE = ICG_MLEditSunken(50, 360, 500, 150, "", SCROLLBAR_V);
+
+    ICG_StaticPanel(50, 390, 250, 30, "Registration Status:");
+    MLE = ICG_MLEditSunken(50, 420, 450, 80, "", SCROLLBAR_V);
+
 
     // Register Button
-    RegisterButton = ICG_Button(150, 515, 100, 30, "Register", RegisterCustomer, nullptr);
-    UploadPhotoButton = ICG_Button(425, 225, 100, 40, "Upload Photo", UploadPhoto);
+    RegisterButton = ICG_Button(650, 475, 100, 30, "Register Now!", RegisterCustomer, nullptr);
+    UploadPhotoButton = ICG_Button(645, 225, 100, 40, "Upload photo", UploadPhoto);
 
     // PhotoFrame
-   
+
     CreateImage(PhotoPreview, 150, 150, 3, ICB_UCHAR);
 
-    // Profil çerçevesi içine beyaz alan
-    FillRect(PhotoPreview, 0, 0, 150, 150, 0xffffff);  
+    // Profil çerçevesinin içine beyaz dikdörtgeni yerleþtiriyoruz
+    FillRect(PhotoPreview, 0, 0, 150, 150, 0xffffff);  // Beyaz renk ile çerçevenin içini dolduruyoruz
 
-    // Profil ikonu için daire çizimi
+    // Profil ikonu için daire çiziyoruz
     int centerX = 75;  // Ortada X koordinatý
     int centerY = 75;  // Ortada Y koordinatý
     int radius = 35;   // Yarýçap
-    int borderColor = 0x000000; // Siyah 
+    int borderColor = 0x000000; // Siyah renk (çerçeve rengi)
 
-    // Profil icon
+    // Profil ikonu: Profil fotoðrafýný temsil eden daire
     DrawFilledCircle(PhotoPreview, centerX, centerY, 35, 0x000000);  // Daireyi çiziyoruz
 
-    // Siyah dikdörtgen
-    int rectColor = 0x000000; // Siyah 
-    FillRect(PhotoPreview, centerX - 30, centerY + radius -5, 60, 70, rectColor);  // Dikdörtgen
+    // Profil ikonu altýna siyah dikdörtgen çiziyoruz
+    int rectColor = 0x000000; // Siyah renk (dikdörtgen için)
+    FillRect(PhotoPreview, centerX - 30, centerY + radius - 5, 60, 70, rectColor);  // Dikdörtgen
 
-    // Fotoðraf çerçevesi
-    PhotoFrame = ICG_FrameThick(390, 50, 150, 150);
+    // Fotoðraf çerçevesini oluþturuyoruz
+    PhotoFrame = ICG_FrameThick(610, 50, 150, 150);
 
-    // Fotoðrafý çerçeveye yerleþtirme
+    // Fotoðrafý çerçeveye yerleþtiriyoruz
     DisplayImage(PhotoFrame, PhotoPreview);
 
     DisplayImage(ArkaPlanFrame, arkaplan);
