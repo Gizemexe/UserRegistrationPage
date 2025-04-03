@@ -24,7 +24,7 @@ struct VERI_TABANI {
 };
 
 void ICGUI_Create() {
-    ICG_MWSize(900, 600);  // Pencereyi daha geniþ yapýyoruz
+    ICG_MWSize(900, 600);  
     ICG_MWTitle("Müþteri Kayýt Formu");
 }
 
@@ -128,7 +128,7 @@ void RegisterCustomer(void* p = nullptr)
     // Health problem (Saðlýk problemi) seçeneði - Seçilen öðeyi al
     ICG_GetListItem(HealthProblemInput, 0, healthProblem);  // HealthProblem seçilen öðe (0 indeksini kullandýk)
 
-    // Health Description (Saðlýk Açýklamasý)
+    // Health Description
     GetText(MLE, healthDesc);
 
     // Fotoðraf kontrolü
@@ -179,9 +179,8 @@ void RegisterCustomer(void* p = nullptr)
     ICG_printf(MLE, "Müþteri kaydedildi:\n");
     Print(MLE, veritaban.bilgi);
 
-    // Fotoðrafý temizle (bir sonraki kayýtta zorunlu olsun)
+    // Fotoðrafý temizle 
     sonFoto = "";
-    //DisplayImage(PhotoFrame, sonFoto); // alaný temizle
 }
 
 void Baslama(VERI_TABANI& v) {
@@ -236,7 +235,6 @@ void DrawFilledCircle(ICBYTES& canvas, int cx, int cy, int radius, int color) {
         FillRect(canvas, cx - dx, cy + y, 2 * dx, 1, color);  // Yatay çizgi çizer, daireyi doldurur
     }
 }
-
 
 void ICGUI_main() {
     ICGUI_Create();
@@ -294,7 +292,7 @@ void ICGUI_main() {
     CreateImage(PhotoPreview, 150, 150, 3, ICB_UCHAR);
 
     // Profil çerçevesi içine beyaz alan
-    FillRect(PhotoPreview, 0, 0, 150, 150, 0xffffff);  // Beyaz renk ile çerçevenin içi doldurulur
+    FillRect(PhotoPreview, 0, 0, 150, 150, 0xffffff);  
 
     // Profil ikonu için daire çizimi
     int centerX = 75;  // Ortada X koordinatý
