@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <iostream> 
 
-int MLE; // Çok satýrlý metin alaný
+int MLE, SLE; // Çok satýrlý metin alaný
 int NameInput, SurnameInput, PhoneInput, EmailInput, PasswordInput, ProblemInput;
 int RegisterButton, UploadPhotoButton, PhotoFrame;
 int GenderInput, HealthProblemInput;
@@ -16,6 +16,7 @@ ICBYTES arkaplan;
 int ArkaPlanFrame;
 
 ICBYTES PhotoPreview;  // Renk önizleme alaný için bir matris
+unsigned currentRecord = 1;
 
 struct VERI_TABANI {
     ICDEVICE index_dosya, veri_dosya;
@@ -106,6 +107,41 @@ void UploadPhoto() {
     }
 }
 
+void OlusturAnahtar(ICBYTES& isim, ICBYTES& soyisim, ICBYTES& key) {
+    CreateMatrix(key, 1, 0, 1, ICB_CHAR);
+
+    for (int i = 1; i <= isim.Y(); i++) {
+        char c = isim.C(1, i);
+        if (c != ' ') {
+            if (c >= 'A' && c <= 'Z') c += 32;
+            key += c;
+        }
+    }
+
+    for (int i = 1; i <= soyisim.Y(); i++) {
+        char c = soyisim.C(1, i);
+        if (c != ' ') {
+            if (c >= 'A' && c <= 'Z') c += 32;
+            key += c;
+        }
+    }
+}
+
+
+void SplitFullName(ICBYTES& full, ICBYTES& isim, ICBYTES& soyisim) {
+    isim = ""; soyisim = "";
+    int i = 1;
+    while (i <= full.Y() && full.B(1, i) != ' ') {
+        isim += full.C(1, i);
+        i++;
+    }
+    i++; // boþluðu atla
+    while (i <= full.Y()) {
+        soyisim += full.C(1, i);
+        i++;
+    }
+}
+
 void RegisterCustomer(void* p = nullptr)
 {
     ICBYTES ad, soyad, telefon, email, sifre, bilgi, virgul, newline, gender, healthProblem, healthDesc;
@@ -137,7 +173,9 @@ void RegisterCustomer(void* p = nullptr)
         return;
     }
 
-    veritaban.anahtar = ad; veritaban.anahtar += soyad;
+ 
+    OlusturAnahtar(ad, soyad, veritaban.anahtar); // direk oraya yaz
+
 
     bilgi = ad; bilgi += virgul;
     bilgi += soyad; bilgi += virgul;
@@ -175,6 +213,7 @@ void RegisterCustomer(void* p = nullptr)
     long long newadd = WriteICBYTES(veritaban.veri_dosya, veritaban.anahtar, veritaban.index.O(3, sonindex));
     newadd = WriteICBYTES(veritaban.veri_dosya, veritaban.bilgi, newadd);
     WriteICBYTES(veritaban.veri_dosya, sonFoto, newadd); // Fotoðraf kaydý
+    WriteICBYTES(veritaban.index_dosya, veritaban.index, 0);
 
     ICG_printf(MLE, "You are registered:\n");
     Print(MLE, veritaban.bilgi);
@@ -182,8 +221,111 @@ void RegisterCustomer(void* p = nullptr)
     // Fotoðrafý temizle (bir sonraki kayýtta zorunlu olsun)
     sonFoto = "";
     //DisplayImage(PhotoFrame, sonFoto); // alaný temizle
+
+    //// Kayýt kontrol için
+    //ICG_printf(MLE, "Kayýt edilen key: %s\n", &temizAdSoyad.C(1));
+
 }
 
+void DisplayRecord(void* p) {
+    VERI_TABANI& vt = (*(VERI_TABANI*)p);
+    if (currentRecord < 1 || currentRecord > vt.index.Y()) {
+        ICG_printf(MLE, "Invalid record.\n");
+        return;
+    }
+
+    // 1. adresi al
+    long long address = vt.index.O(3, currentRecord);
+
+    // 2. sýrayla oku: anahtar, bilgi, fotoðraf
+    long long newadd = ReadICBYTES(vt.veri_dosya, vt.anahtar, address);
+    newadd = ReadICBYTES(vt.veri_dosya, vt.bilgi, newadd);
+    ReadICBYTES(vt.veri_dosya, sonFoto, newadd);
+
+    // 3. bilgiyi virgüllere göre ayýr
+    ICBYTES alanlar[8];
+    for (int i = 0; i < 8; i++) CreateMatrix(alanlar[i], 1, 0, 1, ICB_CHAR);
+
+    int kolon = 1, alanIndex = 0;
+    while (kolon <= vt.bilgi.Y() && alanIndex < 8) {
+        char c = vt.bilgi.C(1, kolon);
+        if (c == ',' || c == '\n') {
+            alanIndex++;
+        }
+        else {
+            alanlar[alanIndex] += c;
+        }
+        kolon++;
+    }
+
+    // 4. kutulara yaz
+    ICG_SetWindowText(NameInput, &alanlar[0].C(1));
+    ICG_SetWindowText(SurnameInput, &alanlar[1].C(1));
+    ICG_SetWindowText(PhoneInput, &alanlar[2].C(1));
+    ICG_SetWindowText(EmailInput, &alanlar[3].C(1));
+    ICG_SetWindowText(PasswordInput, &alanlar[4].C(1));
+    ICG_SetWindowText(ProblemInput, &alanlar[7].C(1));
+
+    // Listbox ayarlarý (isteðe baðlý)
+    //ICG_SetListItem(GenderInput, &alanlar[5].C(1));
+    //ICG_SetListItem(HealthProblemInput, &alanlar[6].C(1));
+
+    // MLE durumu
+    ICG_SetWindowText(MLE, &vt.bilgi.C(1));
+    DisplayImage(PhotoFrame, sonFoto);
+}
+
+
+
+void Ara(void* p) {
+    VERI_TABANI& vt = *((VERI_TABANI*)p);
+    ICBYTES arananKey, isim, soyisim, temizKey;
+
+    // Arama kutusundan ad ve soyad alýnýr
+    GetText(SLE, arananKey);
+    SplitFullName(arananKey, isim, soyisim);
+    OlusturAnahtar(isim, soyisim, temizKey);
+
+    unsigned long long* map = KeyMapTR(temizKey, 2);
+    unsigned hangisi = IndexAra(vt.index, map);
+
+    if (hangisi != 0xffffffff) {
+        vt.burayabak = hangisi;  // mevcut pozisyon güncellenir
+        long long newadd = ReadICBYTES(vt.veri_dosya, vt.anahtar, vt.index.O(3, hangisi));
+        ReadICBYTES(vt.veri_dosya, vt.bilgi, newadd);
+        ICG_SetWindowText(SLE, &vt.anahtar.C(1));
+        ICG_SetWindowText(MLE, &vt.bilgi.C(1));
+    }
+    else {
+        ICG_printf(MLE, "Record not found.\n");
+    }
+}
+
+
+
+
+
+
+void Onceki(void* p) {
+    if (currentRecord > 1) {
+        currentRecord--;
+        DisplayRecord(p);
+    }
+    else {
+        ICG_printf(MLE, "No previous record.\n");
+    }
+}
+
+void Sonraki(void* p) {
+    VERI_TABANI& vt = (*(VERI_TABANI*)p);
+    if (currentRecord < vt.index.Y()) {
+        currentRecord++;
+        DisplayRecord(p);
+    }
+    else {
+        ICG_printf(MLE, "No more records.\n");
+    }
+}
 
 void Baslama(VERI_TABANI& v) {
     CreateMatrix(v.index, 3, 1, ICB_ULONGLONG);
@@ -191,10 +333,12 @@ void Baslama(VERI_TABANI& v) {
     CreateFileDevice(v.index_dosya, "index.bin");
     CreateFileDevice(v.veri_dosya, "veri.bin");
     ReadICBYTES(v.index_dosya, v.index, 0);
+    ICG_printf(MLE, "Index loaded. Kayýt sayýsý: %d\n", v.index.Y());
+
 }
 
 void ExitFonksiyonu(void* t) {
-    VERI_TABANI& veritaban = *((VERI_TABANI*)t);
+    VERI_TABANI& veritaban = (*(VERI_TABANI*)t);
     if (veritaban.index.O(1, 1) != 0)
         WriteICBYTES(veritaban.index_dosya, veritaban.index, 0);
     CloseDevice(veritaban.index_dosya);
@@ -290,6 +434,22 @@ void ICGUI_main() {
     ICG_StaticPanel(50, 390, 250, 30, "Registration Status:");
     MLE = ICG_MLEditSunken(50, 420, 450, 80, "", SCROLLBAR_V);
 
+    //ICG_MLStatic(550, 300, 70, 25, "Search:");  // Static label for the search field
+    //SLE = ICG_SLEditThick(600, 300, 200, 30, "");  // Create the SLE for user to input search key
+
+    //// Create search button
+    //ICG_Button(650, 350, 100, 25, "Search", Ara, &veritaban);
+    ICG_StaticPanel(550, 300, 75, 30, "Search:");
+    SLE = ICG_SLEditThick(630, 300, 215, 30, "");
+
+    //ICG_Button(550, 340, 80, 30, "Search", Ara, &veritaban);         11111
+
+    ICG_Button(762, 340, 80, 30, "Search", Ara, &veritaban);
+    ICG_Button(550, 340, 100, 30, "<< Previous", Onceki, &veritaban);
+
+    // Create Next/Previous buttons for navigating records
+    //ICG_Button(640, 340, 100, 30, "<< Previous", Onceki, &veritaban);  22222
+    ICG_Button(655, 340, 100, 30, "Next >>", Sonraki, &veritaban);
 
     // Register Button
     RegisterButton = ICG_Button(650, 475, 100, 30, "Register Now!", RegisterCustomer, nullptr);
@@ -320,6 +480,7 @@ void ICGUI_main() {
 
     // Fotoðrafý çerçeveye yerleþtiriyoruz
     DisplayImage(PhotoFrame, PhotoPreview);
+
 
     DisplayImage(ArkaPlanFrame, arkaplan);
     ICG_SetOnExit(ExitFonksiyonu, &veritaban);
